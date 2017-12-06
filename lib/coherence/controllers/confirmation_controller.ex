@@ -9,7 +9,7 @@ defmodule Coherence.ConfirmationController do
   use Timex
 
   alias Coherence.ControllerHelpers, as: Helpers
-  alias Coherence.{ConfirmableService, Messages}
+  alias Coherence.{TrackableService, ConfirmableService, Messages}
   alias Ecto.DateTime
   alias Coherence.Schemas
 
@@ -89,10 +89,12 @@ defmodule Coherence.ConfirmationController do
           changeset = Helpers.changeset(:confirmation, user_schema, user, %{
             confirmation_token: nil,
             confirmed_at: DateTime.utc,
-            })
+          })
           case Config.repo.update(changeset) do
-            {:ok, _user} ->
-              conn
+            {:ok, user} ->
+              Config.auth_module()
+              |> apply(Config.create_login(), [conn, user, [id_key: Config.schema_key()]])
+              |> TrackableService.track_login(user, user_schema.trackable?(), user_schema.trackable_table?())
               |> put_flash(:info, Messages.backend().user_account_confirmed_successfully())
               |> redirect_to(:confirmation_edit, params)
             {:error, _changeset} ->
